@@ -6,12 +6,12 @@ from datetime import datetime
 from funcy.colls import walk_values, get_in
 from funcy.flow import silent
 from funcy.seqs import flatten
+
 from steembase.exceptions import (
     PostDoesNotExist,
     VotingInvalidOnArchivedPost,
 )
 from steembase.operations import CommentOptions
-
 from .amount import Amount
 from .commit import Commit
 from .instance import shared_steemd_instance
@@ -243,7 +243,7 @@ class Post(dict):
         """
         # Test if post is archived, if so, voting is worthless but just
         # pollutes the blockchain and account history
-        if not self.get('net_rshares'):
+        if self.get('net_rshares', None) is None:
             raise VotingInvalidOnArchivedPost
         return self.commit.vote(self.identifier, weight, account=voter)
 
