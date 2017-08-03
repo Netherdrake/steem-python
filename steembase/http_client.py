@@ -11,11 +11,16 @@ from urllib.parse import urlparse
 
 import certifi
 import urllib3
-from steembase.exceptions import RPCError
 from urllib3.connection import HTTPConnection
 from urllib3.exceptions import MaxRetryError, ReadTimeoutError, ProtocolError
 
+from steembase.exceptions import RPCError
+
 logger = logging.getLogger(__name__)
+
+
+class SteemdNoResponse(Exception):
+    pass
 
 
 class HttpClient(object):
@@ -157,7 +162,7 @@ class HttpClient(object):
             # try switching nodes before giving up
             if _ret_cnt > 2:
                 time.sleep(5 * _ret_cnt)
-            elif _ret_cnt > 10:
+            elif _ret_cnt >= 10:
                 raise e
             self.next_node()
             logging.debug('Switched node to %s due to exception: %s' %
@@ -187,27 +192,29 @@ class HttpClient(object):
 
     def _return(self, response=None, args=None, return_with_args=None):
         return_with_args = return_with_args or self.return_with_args
+
+        if not response:
+            raise SteemdNoResponse('Steemd nodes have failed to respond, all retries exhausted.')
+
         result = None
+        try:
+            response_json = json.loads(response.data.decode('utf-8'))
+        except Exception as e:
+            extra = dict(response=response, request_args=args, err=e)
+            logger.info('failed to load response', extra=extra)
+        else:
+            if 'error' in response_json:
+                error = response_json['error']
 
-        if response:
-            try:
-                response_json = json.loads(response.data.decode('utf-8'))
-            except Exception as e:
-                extra = dict(response=response, request_args=args, err=e)
-                logger.info('failed to load response', extra=extra)
-                result = None
+                if self.re_raise:
+                    error_message = error.get(
+                        'detail', response_json['error']['message'])
+                    raise RPCError(error_message)
+
+                result = response_json['error']
             else:
-                if 'error' in response_json:
-                    error = response_json['error']
+                result = response_json.get('result', None)
 
-                    if self.re_raise:
-                        error_message = error.get(
-                            'detail', response_json['error']['message'])
-                        raise RPCError(error_message)
-
-                    result = response_json['error']
-                else:
-                    result = response_json.get('result', None)
         if return_with_args:
             return result, args
         else:
