@@ -16,7 +16,9 @@ pip install -U steem
 Full documentation is available at **http://steem.readthedocs.io**
 
 
-## Example Uses
+
+# Example Uses
+Here are a few example scripts that utilize `steem-python`.
 
 ### Syncing Blockchain to a Flat File
 
@@ -76,7 +78,9 @@ wc -l steem.blockchain.json
 
 We can also inspect an arbitrary block, and pretty-print it. *Replace 10000 with desired block\_number + 1.*
 
->     sed '10000q;d' steem.blockchain.json | python -m json.tool
+```
+sed '10000q;d' steem.blockchain.json | python -m json.tool
+```
 
 ### Witness Killswitch
 
@@ -178,8 +182,7 @@ tb.sign()
 tx = tb.broadcast()
 ```
 
-Simple Voting Bot
------------------
+### Simple Voting Bot
 
 Here is a simple bot that will reciprocate by upvoting all new posts that mention us. Make sure to set `whoami` to your Steem username before running.
 
