@@ -6,10 +6,10 @@ import re
 import sys
 
 import pkg_resources
-import steem as stm
 from prettytable import PrettyTable
-from steembase.storage import configStorage
 
+import steem as stm
+from steembase.storage import configStorage
 from .account import Account
 from .amount import Amount
 from .block import Block
@@ -24,6 +24,7 @@ availableConfigurationKeys = [
     "default_account",
     "default_vote_weight",
     "nodes",
+    "round_robin",
 ]
 
 
