@@ -159,10 +159,6 @@ class HttpClient(object):
                 ReadTimeoutError,
                 RemoteDisconnected,
                 ProtocolError) as e:
-            # if we broadcasted a transaction, always raise
-            # this is to prevent potential for double spend scenario
-            if api == 'network_broadcast_api':
-                raise e
 
             # try switching nodes before giving up
             if _ret_cnt > 2:
