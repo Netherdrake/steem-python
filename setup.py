@@ -15,7 +15,7 @@ def readme_file():
 # yapf: disable
 setup(
     name='steem',
-    version='0.18.93',
+    version='0.18.94',
     description='Official Python STEEM Library',
     long_description=open(readme_file()).read(),
     packages=find_packages(exclude=['scripts']),
@@ -42,7 +42,7 @@ setup(
         'w3lib',
         'maya',
         'toolz',
-        'funcy',
+        'funcy>=1.9',
         'langdetect',
         'diff-match-patch',
         'prettytable',
