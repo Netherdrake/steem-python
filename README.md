@@ -9,8 +9,11 @@ full API coverage, and a handful of new features.
 You can install `steem-python` with `pip`:
 
 ```
-pip install -U steem
+pip install -U git+git://github.com/Netherdrake/steem-python
 ```
+
+**Warning: This is NOT the [official](https://github.com/steemit/steem-python) `steem-python` library.
+Use at own risk.**
 
 ## Documentation
 Full documentation is available at **http://steem.readthedocs.io**
