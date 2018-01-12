@@ -6,12 +6,12 @@ from datetime import datetime
 from funcy.colls import walk_values, get_in
 from funcy.flow import silent
 from funcy.seqs import flatten
-
 from steembase.exceptions import (
     PostDoesNotExist,
     VotingInvalidOnArchivedPost,
 )
 from steembase.operations import CommentOptions
+
 from .amount import Amount
 from .commit import Commit
 from .instance import shared_steemd_instance
@@ -203,9 +203,6 @@ class Post(dict):
     def export(self):
         """ This method returns a dictionary that is type-safe to store as JSON or in a database.
         """
-        self.refresh()
-
-        # Remove Steem instance object
         safe_dict = remove_from_dict(self, ['steemd', 'commit'])
 
         # Convert Amount class objects into pure dictionaries
