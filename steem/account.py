@@ -1,10 +1,8 @@
-import datetime
 import math
 import time
 from contextlib import suppress
 
 from funcy.colls import walk_values, get_in
-from funcy.seqs import take
 from funcy.funcs import rpartial
 from steembase.exceptions import AccountDoesNotExistsException
 from toolz import dissoc
@@ -137,30 +135,6 @@ class Account(dict):
         active_votes = {v["voter"]: v for v in getattr(post, "active_votes")}
         return self.name in active_votes
 
-    def curation_stats(self):
-        trailing_24hr_t = time.time() - datetime.timedelta(hours=24).total_seconds()
-        trailing_7d_t = time.time() - datetime.timedelta(days=7).total_seconds()
-
-        reward_24h = 0.0
-        reward_7d = 0.0
-
-        for reward in take(5000, self.history_reverse(filter_by="curation_reward")):
-
-            timestamp = parse_time(reward['timestamp']).timestamp()
-            if timestamp > trailing_7d_t:
-                reward_7d += Amount(reward['reward']).amount
-
-            if timestamp > trailing_24hr_t:
-                reward_24h += Amount(reward['reward']).amount
-
-        reward_7d = self.converter.vests_to_sp(reward_7d)
-        reward_24h = self.converter.vests_to_sp(reward_24h)
-        return {
-            "24hr": reward_24h,
-            "7d": reward_7d,
-            "avg": reward_7d / 7,
-        }
-
     def virtual_op_count(self):
         try:
             last_item = self.steemd.get_account_history(self.name, -1, 0)[0][0]
@@ -212,7 +186,6 @@ class Account(dict):
                 "followers_count": len(followers),
                 "following": following,
                 "following_count": len(following),
-                "curation_stats": self.curation_stats(),
                 "withdrawal_routes": self.get_withdraw_routes(),
                 "conversion_requests": self.get_conversion_requests(),
             }
