@@ -58,7 +58,7 @@ class HttpClient(object):
         self.round_robin = kwargs.get('round_robin', False)
 
         num_pools = kwargs.get('num_pools', 10)
-        maxsize = kwargs.get('maxsize', 10)
+        maxsize = kwargs.get('maxsize', 100)
         timeout = kwargs.get('timeout', 60)
         retries = kwargs.get('retries', 20)
         pool_block = kwargs.get('pool_block', False)
