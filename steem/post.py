@@ -6,12 +6,12 @@ from datetime import datetime
 from funcy.colls import walk_values, get_in
 from funcy.flow import silent
 from funcy.seqs import flatten
+
 from steembase.exceptions import (
     PostDoesNotExist,
     VotingInvalidOnArchivedPost,
 )
 from steembase.operations import CommentOptions
-
 from .amount import Amount
 from .commit import Commit
 from .instance import shared_steemd_instance
@@ -89,10 +89,12 @@ class Post(dict):
 
         # turn json_metadata into python dict
         meta_str = post.get("json_metadata", "{}")
-        post['json_metadata'] = silent(json.loads)(meta_str) or {}
+        try:
+            post['json_metadata'] = json.loads(meta_str)
+        except:
+            post['json_metadata'] = {}
 
         post["tags"] = []
-        post['community'] = ''
         if isinstance(post['json_metadata'], dict):
             if post["depth"] == 0:
                 user_tags = post['json_metadata'].get('tags', [])
@@ -102,7 +104,6 @@ class Post(dict):
                     post["parent_permlink"],
                     *user_tags
                 )
-
             post['community'] = get_in(post, ['json_metadata', 'community'], default='')
 
         # If this post is a comment, retrieve the root comment
