@@ -173,30 +173,26 @@ class Account(dict):
         return filtered_items
 
     def export(self, load_extras=True):
-        """ This method returns a dictionary that is type-safe to store as JSON or in a database.
+        """ Strip Python specific data-types and return a dictionary
+        that can be safely stored as JSON or database entry.
 
-            :param bool load_extras: Fetch extra information related to the account (this might take a while).
+            Args:
+                load_extras: Fetch extra information related to the account.
         """
         extras = dict()
         if load_extras:
-            followers = self.get_followers()
-            following = self.get_following()
             extras = {
-                "followers": followers,
-                "followers_count": len(followers),
-                "following": following,
-                "following_count": len(following),
-                "withdrawal_routes": self.get_withdraw_routes(),
+                "profile": self.profile,
+                "sp": self.sp,
+                "rep": self.rep,
+                "balances": self.get_balances(),
+                "withdraw_routes": self.get_withdraw_routes(),
                 "conversion_requests": self.get_conversion_requests(),
             }
 
         return {
             **self,
             **extras,
-            "profile": self.profile,
-            "sp": self.sp,
-            "rep": self.rep,
-            "balances": self.get_balances(),
         }
 
     def get_account_history(self, index, limit, start=None, stop=None, order=-1, filter_by=None, raw_output=False):
