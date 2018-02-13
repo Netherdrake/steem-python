@@ -1,0 +1,87 @@
+{% set data = load_setup_py_data() %}
+package:
+  name: steem
+  version: {{ data['version'] }}
+
+source:
+  path: ..
+
+build:
+  number: 0
+  skip: True  # [py<35]
+  script: python -m pip install --no-deps --ignore-installed .
+  entry_points:
+    - piston = steem.cli:legacy
+    - steempy = steem.cli:legacy
+
+extra:
+  channels:
+    - conda-forge
+
+requirements:
+  build:
+    - python
+    - pip
+    - setuptools
+    {% for dep in data['setup_requires'] %}
+    - {{ dep.lower().replace(">="," >=").replace("=="," ==") }}
+    {% endfor %}
+    {% for dep in data['tests_require'] %}
+    - {{ dep.lower().replace(">="," >=").replace("=="," ==") }}
+    {% endfor %}
+
+  run:
+    - python
+    - setuptools
+    {% for dep in data['install_requires'] %}
+    - {{ dep.lower().replace(">="," >=").replace("=="," ==") }}
+    {% endfor %}
+
+test:
+  imports:
+    - steem
+    - steem.account
+    - steem.amount
+    - steem.post
+    - steem.dex
+    - steem.aes
+    - steem.block
+    - steem.blockchain
+    - steem.cli
+    - steem.commit
+    - steem.converter
+    - steem.instance
+    - steem.profile
+    - steem.steem
+    - steem.steemd
+    - steem.transactionbuilder
+    - steem.utils
+    - steem.wallet
+    - steem.witness
+    - steembase
+    - steembase.account
+    - steembase.base58
+    - steembase.bip38
+    - steembase.chains
+    - steembase.exceptions
+    - steembase.http_client
+    - steembase.operationids
+    - steembase.operations
+    - steembase.storage
+    - steembase.transactions
+    - steembase.types
+
+  commands:
+    - conda inspect linkages -p $PREFIX steem  # [not win]
+    - conda inspect objects -p $PREFIX steem   # [osx]
+    - steempy --help
+    - piston --help
+
+about:
+  home: https://github.com/Netherdrake/steem-python
+  license: MIT
+  license_file: LICENSE
+  dev_url: https://github.com/Netherdrake/steem-python
+  doc_url: http://steem.readthedocs.io/
+  summary: 'A Python library/toolkit for the Steem blockchain'
+
