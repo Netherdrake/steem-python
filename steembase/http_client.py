@@ -19,7 +19,11 @@ from steembase.exceptions import RPCError
 logger = logging.getLogger(__name__)
 
 
-class SteemdNoResponse(Exception):
+class SteemdNoResponse(BaseException):
+    pass
+
+
+class SteemdBadResponse(BaseException):
     pass
 
 
@@ -53,13 +57,12 @@ class HttpClient(object):
 
     def __init__(self, nodes, **kwargs):
         self.return_with_args = kwargs.get('return_with_args', False)
-        self.re_raise = kwargs.get('re_raise', True)
         self.max_workers = kwargs.get('max_workers', None)
 
         num_pools = kwargs.get('num_pools', 10)
         maxsize = kwargs.get('maxsize', 100)
-        timeout = kwargs.get('timeout', 60)
-        retries = kwargs.get('retries', 20)
+        timeout = kwargs.get('timeout', 30)
+        retries = kwargs.get('retries', 10)
         pool_block = kwargs.get('pool_block', False)
         tcp_keepalive = kwargs.get('tcp_keepalive', True)
 
@@ -103,6 +106,7 @@ class HttpClient(object):
 
     def set_node(self, node_url):
         """ Change current node to provided node URL. """
+        logger.info('Changing http node from %s to %s' % (self.url, node_url))
         self.url = node_url
         self.request = partial(self.http.urlopen, 'POST', self.url)
 
@@ -157,7 +161,7 @@ class HttpClient(object):
 
             # try switching nodes before giving up
             if _ret_cnt > 2:
-                time.sleep(5 * _ret_cnt)
+                time.sleep(1 * _ret_cnt)
             elif _ret_cnt >= 10:
                 raise e
             self.next_node()
@@ -166,20 +170,13 @@ class HttpClient(object):
             return self.exec(name, *args,
                              return_with_args=return_with_args,
                              _ret_cnt=_ret_cnt + 1)
-        except Exception as e:
-            if self.re_raise:
-                raise e
-            else:
-                extra = dict(err=e, request=self.request)
-                logger.info('Request error', extra=extra)
-                return self._return(
-                    response=response,
-                    args=args,
-                    return_with_args=return_with_args)
         else:
-            if response.status not in tuple(
-                    [*response.REDIRECT_STATUSES, 200]):
-                logger.info('non 200 response:%s', response.status)
+            if not response:
+                raise SteemdNoResponse('Steemd failed to respond.')
+
+            valid_response_codes = tuple([*response.REDIRECT_STATUSES, 200])
+            if response.status not in valid_response_codes:
+                raise SteemdBadResponse(response)
 
             return self._return(
                 response=response,
@@ -189,10 +186,7 @@ class HttpClient(object):
     def _return(self, response=None, args=None, return_with_args=None):
         return_with_args = return_with_args or self.return_with_args
 
-        if not response:
-            raise SteemdNoResponse('Steemd nodes have failed to respond, all retries exhausted.')
-
-        result = None
+        response_json = None
         try:
             response_json = json.loads(response.data.decode('utf-8'))
         except Exception as e:
@@ -202,15 +196,11 @@ class HttpClient(object):
             if 'error' in response_json:
                 error = response_json['error']
 
-                if self.re_raise:
-                    error_message = error.get(
-                        'detail', response_json['error']['message'])
-                    raise RPCError(error_message)
+                error_message = error.get(
+                    'detail', response_json['error']['message'])
+                raise RPCError(error_message)
 
-                result = response_json['error']
-            else:
-                result = response_json.get('result', None)
-
+        result = response_json.get('result', None)
         if return_with_args:
             return result, args
         else:
