@@ -3,7 +3,6 @@ import concurrent.futures
 import json
 import logging
 import socket
-import time
 from functools import partial
 from http.client import RemoteDisconnected
 from itertools import cycle
@@ -58,6 +57,7 @@ class HttpClient(object):
     def __init__(self, nodes, **kwargs):
         self.return_with_args = kwargs.get('return_with_args', False)
         self.max_workers = kwargs.get('max_workers', None)
+        self.max_failovers = kwargs.get('max_failovers', 10)
 
         num_pools = kwargs.get('num_pools', 10)
         maxsize = kwargs.get('maxsize', 100)
@@ -149,6 +149,13 @@ class HttpClient(object):
             node fail-over, unless we are broadcasting a transaction.
             In latter case, the exception is **re-raised**.
         """
+
+        def failover():
+            self.next_node()
+            return self.exec(name, *args,
+                             return_with_args=return_with_args,
+                             _ret_cnt=_ret_cnt + 1)
+
         body = HttpClient.json_rpc_body(name, *args, api=api)
         response = None
         try:
@@ -160,23 +167,24 @@ class HttpClient(object):
                 ProtocolError) as e:
 
             # try switching nodes before giving up
-            if _ret_cnt > 2:
-                time.sleep(1 * _ret_cnt)
-            elif _ret_cnt >= 10:
+            if _ret_cnt >= self.max_failovers:
                 raise e
-            self.next_node()
-            logging.debug('Switched node to %s due to exception: %s' %
-                          (self.hostname, e.__class__.__name__))
-            return self.exec(name, *args,
-                             return_with_args=return_with_args,
-                             _ret_cnt=_ret_cnt + 1)
+            logging.info('Retrying a request on a new node %s due to exception: %s' %
+                         (self.hostname, e.__class__.__name__))
+            return failover()
+
         else:
             if not response:
                 raise SteemdNoResponse('Steemd failed to respond.')
 
-            valid_response_codes = tuple([*response.REDIRECT_STATUSES, 200])
-            if response.status not in valid_response_codes:
-                raise SteemdBadResponse(response)
+            if response.status is not 200:
+                # try switching nodes before giving up
+                if _ret_cnt >= self.max_failovers:
+                    raise SteemdBadResponse(response)
+                logging.info(
+                    'Retrying a request on a new node %s due to bad response: %s' %
+                    (self.hostname, response.status))
+                return failover()
 
             return self._return(
                 response=response,
