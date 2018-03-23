@@ -55,7 +55,6 @@ class HttpClient(object):
         self.return_with_args = kwargs.get('return_with_args', False)
         self.re_raise = kwargs.get('re_raise', True)
         self.max_workers = kwargs.get('max_workers', None)
-        self.round_robin = kwargs.get('round_robin', False)
 
         num_pools = kwargs.get('num_pools', 10)
         maxsize = kwargs.get('maxsize', 100)
@@ -146,10 +145,6 @@ class HttpClient(object):
             node fail-over, unless we are broadcasting a transaction.
             In latter case, the exception is **re-raised**.
         """
-        # rotate nodes to distribute the load
-        if self.round_robin:
-            self.next_node()
-
         body = HttpClient.json_rpc_body(name, *args, api=api)
         response = None
         try:
