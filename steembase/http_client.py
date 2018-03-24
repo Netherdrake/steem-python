@@ -174,9 +174,6 @@ class HttpClient(object):
             return failover()
 
         else:
-            if not response:
-                raise SteemdNoResponse('Steemd failed to respond.')
-
             if response.status is not 200:
                 # try switching nodes before giving up
                 if _ret_cnt >= self.max_failovers:
@@ -186,33 +183,35 @@ class HttpClient(object):
                     (self.hostname, response.status))
                 return failover()
 
-            return self._return(
-                response=response,
-                args=args,
-                return_with_args=return_with_args)
-
-    def _return(self, response=None, args=None, return_with_args=None):
-        return_with_args = return_with_args or self.return_with_args
-
         response_json = None
         try:
             response_json = json.loads(response.data.decode('utf-8'))
         except Exception as e:
+            # try switching nodes before giving up
+            if _ret_cnt >= self.max_failovers:
+                raise SteemdBadResponse(response)
             extra = dict(response=response, request_args=args, err=e)
-            logger.info('failed to load response', extra=extra)
+            logger.info('RPC returned malformed response', extra=extra)
+            return failover()
         else:
             if 'error' in response_json:
+                # todo: failover() on node related errors only
                 error = response_json['error']
-
                 error_message = error.get(
                     'detail', response_json['error']['message'])
-                raise RPCError(error_message)
+                if _ret_cnt >= self.max_failovers:
+                    raise RPCError(error_message)
+                logger.info('RPC returned an error %s' % error_message)
+                return failover()
 
-        result = response_json.get('result', None)
+            if 'result' not in response_json:
+                # todo: does this ever happen
+                raise SteemdBadResponse('The response is missing a "result".')
+
         if return_with_args:
-            return result, args
+            return response_json['result'], args
         else:
-            return result
+            return response_json['result']
 
     def exec_multi_with_futures(self, name, params, api=None, max_workers=None):
         with concurrent.futures.ThreadPoolExecutor(
