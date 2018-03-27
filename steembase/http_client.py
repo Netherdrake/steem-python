@@ -3,7 +3,6 @@ import concurrent.futures
 import json
 import logging
 import socket
-import time
 from functools import partial
 from http.client import RemoteDisconnected
 from itertools import cycle
@@ -19,7 +18,11 @@ from steembase.exceptions import RPCError
 logger = logging.getLogger(__name__)
 
 
-class SteemdNoResponse(Exception):
+class SteemdNoResponse(BaseException):
+    pass
+
+
+class SteemdBadResponse(BaseException):
     pass
 
 
@@ -53,14 +56,13 @@ class HttpClient(object):
 
     def __init__(self, nodes, **kwargs):
         self.return_with_args = kwargs.get('return_with_args', False)
-        self.re_raise = kwargs.get('re_raise', True)
         self.max_workers = kwargs.get('max_workers', None)
-        self.round_robin = kwargs.get('round_robin', False)
+        self.max_failovers = kwargs.get('max_failovers', 10)
 
         num_pools = kwargs.get('num_pools', 10)
         maxsize = kwargs.get('maxsize', 100)
-        timeout = kwargs.get('timeout', 60)
-        retries = kwargs.get('retries', 20)
+        timeout = kwargs.get('timeout', 30)
+        retries = kwargs.get('retries', 10)
         pool_block = kwargs.get('pool_block', False)
         tcp_keepalive = kwargs.get('tcp_keepalive', True)
 
@@ -104,6 +106,7 @@ class HttpClient(object):
 
     def set_node(self, node_url):
         """ Change current node to provided node URL. """
+        logger.info('Changing http node from %s to %s' % (self.url, node_url))
         self.url = node_url
         self.request = partial(self.http.urlopen, 'POST', self.url)
 
@@ -146,9 +149,12 @@ class HttpClient(object):
             node fail-over, unless we are broadcasting a transaction.
             In latter case, the exception is **re-raised**.
         """
-        # rotate nodes to distribute the load
-        if self.round_robin:
+
+        def failover():
             self.next_node()
+            return self.exec(name, *args,
+                             return_with_args=return_with_args,
+                             _ret_cnt=_ret_cnt + 1)
 
         body = HttpClient.json_rpc_body(name, *args, api=api)
         response = None
@@ -161,65 +167,51 @@ class HttpClient(object):
                 ProtocolError) as e:
 
             # try switching nodes before giving up
-            if _ret_cnt > 2:
-                time.sleep(5 * _ret_cnt)
-            elif _ret_cnt >= 10:
+            if _ret_cnt >= self.max_failovers:
                 raise e
-            self.next_node()
-            logging.debug('Switched node to %s due to exception: %s' %
-                          (self.hostname, e.__class__.__name__))
-            return self.exec(name, *args,
-                             return_with_args=return_with_args,
-                             _ret_cnt=_ret_cnt + 1)
-        except Exception as e:
-            if self.re_raise:
-                raise e
-            else:
-                extra = dict(err=e, request=self.request)
-                logger.info('Request error', extra=extra)
-                return self._return(
-                    response=response,
-                    args=args,
-                    return_with_args=return_with_args)
+            logging.info('Retrying a request on a new node %s due to exception: %s' %
+                         (self.hostname, e.__class__.__name__))
+            return failover()
+
         else:
-            if response.status not in tuple(
-                    [*response.REDIRECT_STATUSES, 200]):
-                logger.info('non 200 response:%s', response.status)
+            if response.status is not 200:
+                # try switching nodes before giving up
+                if _ret_cnt >= self.max_failovers:
+                    raise SteemdBadResponse(response)
+                logging.info(
+                    'Retrying a request on a new node %s due to bad response: %s' %
+                    (self.hostname, response.status))
+                return failover()
 
-            return self._return(
-                response=response,
-                args=args,
-                return_with_args=return_with_args)
-
-    def _return(self, response=None, args=None, return_with_args=None):
-        return_with_args = return_with_args or self.return_with_args
-
-        if not response:
-            raise SteemdNoResponse('Steemd nodes have failed to respond, all retries exhausted.')
-
-        result = None
+        response_json = None
         try:
             response_json = json.loads(response.data.decode('utf-8'))
         except Exception as e:
+            # try switching nodes before giving up
+            if _ret_cnt >= self.max_failovers:
+                raise SteemdBadResponse(response)
             extra = dict(response=response, request_args=args, err=e)
-            logger.info('failed to load response', extra=extra)
+            logger.info('RPC returned malformed response', extra=extra)
+            return failover()
         else:
             if 'error' in response_json:
+                # todo: failover() on node related errors only
                 error = response_json['error']
-
-                if self.re_raise:
-                    error_message = error.get(
-                        'detail', response_json['error']['message'])
+                error_message = error.get(
+                    'detail', response_json['error']['message'])
+                if _ret_cnt >= self.max_failovers:
                     raise RPCError(error_message)
+                logger.info('RPC returned an error %s' % error_message)
+                return failover()
 
-                result = response_json['error']
-            else:
-                result = response_json.get('result', None)
+            if 'result' not in response_json:
+                # todo: does this ever happen
+                raise SteemdBadResponse('The response is missing a "result".')
 
         if return_with_args:
-            return result, args
+            return response_json['result'], args
         else:
-            return result
+            return response_json['result']
 
     def exec_multi_with_futures(self, name, params, api=None, max_workers=None):
         with concurrent.futures.ThreadPoolExecutor(

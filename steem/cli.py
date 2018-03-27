@@ -24,7 +24,6 @@ availableConfigurationKeys = [
     "default_account",
     "default_vote_weight",
     "nodes",
-    "round_robin",
 ]
 
 

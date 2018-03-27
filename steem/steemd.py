@@ -51,7 +51,6 @@ class Steemd(HttpClient):
     def __init__(self, nodes=None, **kwargs):
         if not nodes:
             nodes = get_config_node_list() or ['https://api.steemit.com']
-        kwargs['round_robin'] = bool(configStorage.get('round_robin', None))
         
         super(Steemd, self).__init__(nodes, **kwargs)
 
