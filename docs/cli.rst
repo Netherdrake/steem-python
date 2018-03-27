@@ -24,7 +24,7 @@ To bypass password entry, you can set an environmnet variable ``UNLOCK``.
 
 ::
 
-    UNLOCK=mysecretpassword steempy transfer 100 STEEM <recipient>
+    UNLOCK=mysecretpassword steempy transfer <recipient_name> 100 STEEM
 
 Common Commands
 ---------------
@@ -57,7 +57,7 @@ Sending funds:
 
 ::
 
-   steempy transfer --account <account_name> 100 STEEM <recipient_name> memo
+   steempy transfer --account <account_name> <recipient_name> 100 STEEM memo
 
 Upvoting a post:
 
@@ -88,7 +88,7 @@ If you've set up your `default_account`, you can now send funds by omitting this
 
 ::
 
-    steempy transfer 100 STEEM <recipient_name> memo
+    steempy transfer <recipient_name> 100 STEEM memo
 
 
 Help
