@@ -160,19 +160,13 @@ class HttpClient(object):
         response = None
         try:
             response = self.request(body=body)
-        except (MaxRetryError,
-                ConnectionResetError,
-                ReadTimeoutError,
-                RemoteDisconnected,
-                ProtocolError) as e:
-
+        except Exception as e:
             # try switching nodes before giving up
             if _ret_cnt >= self.max_failovers:
                 raise e
             logging.info('Retrying a request on a new node %s due to exception: %s' %
                          (self.hostname, e.__class__.__name__))
             return failover()
-
         else:
             if response.status is not 200:
                 # try switching nodes before giving up
