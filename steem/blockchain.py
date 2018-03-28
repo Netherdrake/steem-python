@@ -63,10 +63,9 @@ class Blockchain(object):
 
         _ = kwargs  # we need this
         # Let's find out how often blocks are generated!
-        block_interval = self.config().get(
-            "STEEMIT_BLOCK_INTERVAL",
-            self.config()['STEEM_BLOCK_INTERVAL']
-        )
+        config = self.config()
+        block_interval = config.get("STEEMIT_BLOCK_INTERVAL") \
+                         or config['STEEM_BLOCK_INTERVAL']
 
         if not start_block:
             start_block = self.get_current_block_num()
